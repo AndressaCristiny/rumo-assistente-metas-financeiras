@@ -85,7 +85,7 @@ flowchart TD
     D[(data/<br/>perfil · transações<br/>produtos · atendimentos)] --> C
 
     C -->|orçamento, metas,<br/>conflito, produtos filtrados| E[contexto.py<br/>monta bloco de FATOS]
-    E -->|system prompt + FATOS + pergunta| F[Ollama<br/>LLM local]
+    E -->|system_instruction<br/>+ FATOS| F[API do Gemini<br/>Flash-Lite · camada gratuita]
     F -->|texto explicativo| B
 
     C -.->|os mesmos fatos,<br/>sem passar pelo LLM| G[Painel lateral<br/>números auditáveis]
@@ -106,10 +106,16 @@ misturam, e é isso que torna o agente auditável.
 |---|---|---|
 | `src/motor.py` | Lê `data/`, calcula orçamento, metas, conflito e filtra produtos por regra | Não |
 | `src/contexto.py` | Converte os fatos em texto e guarda o system prompt | Não |
-| `src/app.py` | Interface Streamlit, conversa e chamada ao Ollama | Sim |
+| `src/llm.py` | Chamada à API do Gemini — só texto, nenhum número | Sim |
+| `src/app.py` | Interface Streamlit e estado da conversa | Não diretamente |
 | `avaliacao/avaliar.py` | 25 verificações automáticas sobre a camada de cálculo | Não |
 
-Três dos quatro módulos rodam sem modelo nenhum. Só a redação depende do LLM.
+Quatro dos cinco módulos rodam sem modelo nenhum. Só `llm.py` depende da API.
+
+O bloco de FATOS vai no `system_instruction`, não na mensagem do usuário: fato é
+contexto, não fala de quem pergunta. Já o histórico da conversa fica no servidor
+— cada resposta devolve um id de interação, e o turno seguinte o referencia em
+vez de reenviar tudo.
 
 ---
 

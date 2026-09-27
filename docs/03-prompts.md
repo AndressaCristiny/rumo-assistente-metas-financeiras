@@ -1,13 +1,18 @@
 # Prompts do Agente
 
-O prompt do Rumo tem três camadas, montadas em `src/contexto.py`:
+O prompt do Rumo tem quatro partes, e cada uma ocupa um campo distinto da
+requisição em vez de virar uma string só:
 
-```
-[ SYSTEM PROMPT ]   quem ele é, o que não pode fazer
-[ FATOS       ]     números já calculados pelo motor.py — única fonte permitida
-[ CONVERSA    ]     últimas 6 mensagens, para dar continuidade
-[ PERGUNTA    ]     o que a pessoa acabou de escrever
-```
+| Parte | Onde vai | Por quê |
+|---|---|---|
+| **System prompt** | `system_instruction` | Quem ele é e o que não pode fazer |
+| **Bloco de FATOS** | `system_instruction`, logo abaixo | Única fonte de números. É contexto, não fala do usuário |
+| **Conversa** | no servidor, via `previous_interaction_id` | Continuidade sem reenviar o histórico a cada turno |
+| **Pergunta** | `input` | O que a pessoa acabou de escrever |
+
+Separar assim importa. Empilhar tudo numa string — como seria obrigatório numa
+API de completion simples — confunde os papéis: o modelo passa a tratar os
+FATOS como se fossem algo que o usuário afirmou, e não como instrução.
 
 ## System Prompt
 
@@ -155,9 +160,9 @@ mais perigoso que uma recusa.
 
 > **Estado da validação, sem maquiagem.** A camada de cálculo tem 25
 > verificações automáticas, todas passando ([`04-metricas.md`](04-metricas.md)).
-> A camada de texto **ainda não foi executada** contra um LLM: o Ollama roda
-> localmente e as respostas acima são o comportamento *especificado*, não
-> transcrições. A rubrica de avaliação manual está pronta em
+> A camada de texto **ainda não foi executada** contra o modelo: é preciso uma
+> chave da API do Gemini, e as respostas acima são o comportamento
+> *especificado*, não transcrições. A rubrica de avaliação manual está pronta em
 > [`04-metricas.md`](04-metricas.md) e é o próximo passo do projeto.
 
 **Por que a proibição de calcular vem antes de tudo.** A ordem das instruções

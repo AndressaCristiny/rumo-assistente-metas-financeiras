@@ -76,7 +76,7 @@ Sequência sugerida, com a tela dividida entre o painel lateral e a conversa:
 - [ ] Rodar a suíte de avaliação ao vivo
 - [ ] Fechar com "prompt reduz a chance, arquitetura elimina a categoria"
 - [ ] Não passar de 3 minutos — cronometrar no ensaio
-- [ ] Ter o Ollama já carregado antes de gravar (a primeira resposta é sempre a mais lenta)
+- [ ] Fazer uma pergunta de aquecimento antes de gravar, para o cache do prompt já estar quente
 
 ## Link do Vídeo
 

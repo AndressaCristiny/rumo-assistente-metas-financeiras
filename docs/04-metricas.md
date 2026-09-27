@@ -7,7 +7,7 @@ O Rumo tem duas camadas e elas exigem avaliações diferentes:
 | Camada | O que é | Como se avalia | Estado |
 |---|---|---|---|
 | **Cálculo** (`motor.py`) | Todo número que o agente afirma | Determinística, automatizada, sem LLM | ✅ 25/25 passando |
-| **Redação** (LLM) | O texto em volta dos números | Rubrica manual, resposta a resposta | ⏳ pendente — exige Ollama local |
+| **Redação** (LLM) | O texto em volta dos números | Rubrica manual, resposta a resposta | ⏳ pendente — exige chave de API |
 
 Essa separação é consequência direta da arquitetura. Como nenhum número nasce
 no modelo, **a parte perigosa do agente é testável como software comum**. Sobra
@@ -117,7 +117,7 @@ realmente importa, que é se o dado **chegou ao modelo**.
 
 ### Pendente
 
-A avaliação da camada de redação exige Ollama rodando e ainda não foi feita.
+A avaliação da camada de redação exige uma chave da API do Gemini e ainda não foi feita.
 O procedimento está definido: rodar as 10 perguntas de `avaliacao/casos.json`,
 pontuar cada resposta na rubrica de cinco critérios, e registrar aqui a tabela
 com as notas e os ajustes de prompt que forem necessários.
