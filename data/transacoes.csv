@@ -1,0 +1,34 @@
+data,descricao,categoria,valor,tipo
+2025-08-01,Salário,receita,5000.00,entrada
+2025-08-02,Aluguel,moradia,1200.00,saida
+2025-08-04,Supermercado,alimentacao,520.00,saida
+2025-08-05,Netflix,lazer,55.90,saida
+2025-08-08,Farmácia,saude,64.00,saida
+2025-08-11,Restaurante,alimentacao,145.00,saida
+2025-08-13,Uber,transporte,62.00,saida
+2025-08-15,Conta de Luz,moradia,165.00,saida
+2025-08-18,Curso online,educacao,89.00,saida
+2025-08-20,Academia,saude,99.00,saida
+2025-08-24,Combustível,transporte,230.00,saida
+2025-08-28,Presente aniversário,lazer,180.00,saida
+2025-09-01,Salário,receita,5000.00,entrada
+2025-09-02,Aluguel,moradia,1200.00,saida
+2025-09-03,Supermercado,alimentacao,480.00,saida
+2025-09-05,Netflix,lazer,55.90,saida
+2025-09-09,Farmácia,saude,45.00,saida
+2025-09-12,Restaurante,alimentacao,98.00,saida
+2025-09-14,Uber,transporte,38.00,saida
+2025-09-15,Conta de Luz,moradia,192.00,saida
+2025-09-19,Manutenção do carro,transporte,640.00,saida
+2025-09-20,Academia,saude,99.00,saida
+2025-09-26,Combustível,transporte,245.00,saida
+2025-10-01,Salário,receita,5000.00,entrada
+2025-10-02,Aluguel,moradia,1200.00,saida
+2025-10-03,Supermercado,alimentacao,450.00,saida
+2025-10-05,Netflix,lazer,55.90,saida
+2025-10-07,Farmácia,saude,89.00,saida
+2025-10-10,Restaurante,alimentacao,120.00,saida
+2025-10-12,Uber,transporte,45.00,saida
+2025-10-15,Conta de Luz,moradia,180.00,saida
+2025-10-20,Academia,saude,99.00,saida
+2025-10-25,Combustível,transporte,250.00,saida
