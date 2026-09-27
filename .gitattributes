@@ -1,0 +1,4 @@
+# Normaliza a quebra de linha: LF no repositorio, o que a plataforma usa no disco.
+# Sem isso, clonar no Windows faz o git enxergar todos os arquivos como alterados.
+* text=auto eol=lf
+*.csv text eol=lf
