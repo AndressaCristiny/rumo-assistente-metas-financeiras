@@ -7,6 +7,7 @@ O Rumo tem duas camadas e elas exigem avaliações diferentes:
 | Camada | O que é | Como se avalia | Estado |
 |---|---|---|---|
 | **Cálculo** (`motor.py`) | Todo número que o agente afirma | Determinística, automatizada, sem LLM | ✅ 25/25 passando |
+| **Definição** (`agent/`) | Persona, comandos e contratos de skill | Determinística, automatizada, sem LLM | ✅ 6/6 passando |
 | **Redação** (LLM) | O texto em volta dos números | Rubrica manual, resposta a resposta | ⏳ pendente — exige chave de API |
 
 Essa separação é consequência direta da arquitetura. Como nenhum número nasce
@@ -25,9 +26,9 @@ Sai com código 0 se tudo passa e 1 se algo falha, então serve em CI.
 
 ## Métricas de Qualidade
 
-### Camada de cálculo — automatizada
+### Camadas automatizadas
 
-Quatro grupos, 25 verificações, definidos em `avaliacao/casos.json`:
+Cinco grupos, 31 verificações, definidos em `avaliacao/casos.json`:
 
 | Grupo | Casos | O que garante |
 |---|---|---|
@@ -35,11 +36,18 @@ Quatro grupos, 25 verificações, definidos em `avaliacao/casos.json`:
 | **Consistência interna** | 6 | Os números concordam entre si: `falta = necessário − atual`, `aporte × meses = falta`, `déficit > 0 ⟺ não cabe tudo` |
 | **Regras de produto** | 4 | O filtro respeita risco, prazo e aporte mínimo — nenhum produto de risco alto para cliente avesso a risco |
 | **Cobertura de fatos** | 7 | Para cada pergunta prevista, o dado necessário **existe no bloco de fatos**. Se não existir, o modelo só poderia responder inventando |
+| **Definição do agente** | 6 | A persona está no markdown e **só lá**, mantém a regra nº 1, todo comando tem pergunta, toda skill citada tem contrato |
 
 O quarto grupo é o mais interessante e o menos óbvio. Ele não testa a resposta —
 testa se o agente **tinha como** responder. Uma pergunta cujo fato não está no
 contexto é uma alucinação esperando para acontecer, e isso dá para detectar sem
 rodar o modelo.
+
+O quinto grupo testa algo diferente: não o comportamento, mas a honestidade do
+repositório. `D3` falha se qualquer frase longa de `agent/persona.md` reaparecer
+dentro do Python — o cenário em que documentação e código voltariam a divergir
+em silêncio. `D5` e `D6` impedem que um comando cite uma skill inexistente ou
+que uma skill declarada aponte para uma função que ninguém escreveu.
 
 ### Camada de redação — rubrica manual
 
@@ -95,15 +103,26 @@ mesmo que pareça razoável. Este é o teste mais importante do conjunto.
 Execução de `python avaliacao/avaliar.py`, com os dados em `data/`:
 
 ```
-=== CORREÇÃO DO CÁLCULO ===            8/8   PASSA
-=== CONSISTÊNCIA INTERNA ===           6/6   PASSA
-=== REGRAS DE SELEÇÃO DE PRODUTO ===   4/4   PASSA
-=== COBERTURA DE FATOS POR PERGUNTA === 7/7  PASSA
+=== CORREÇÃO DO CÁLCULO ===             8/8   PASSA
+=== CONSISTÊNCIA INTERNA ===            6/6   PASSA
+=== REGRAS DE SELEÇÃO DE PRODUTO ===    4/4   PASSA
+=== COBERTURA DE FATOS POR PERGUNTA ===  7/7  PASSA
+=== DEFINIÇÃO DO AGENTE ===             6/6   PASSA
 ------------------------------------------------------------
-25/25 verificações automáticas passaram  |  3 casos de recusa para avaliação manual
+31/31 verificações automáticas passaram  |  3 casos de recusa para avaliação manual
 ```
 
-**A suíte já pegou um erro real.** Na primeira execução, o caso `B1` ("Consigo
+**A suíte já pegou dois erros reais.**
+
+O primeiro, na estreia do grupo de definição: `D3` falhou logo na primeira
+execução. O motivo era o próprio `src/agente.py`, que citava a frase
+"VOCÊ NÃO FAZ CONTAS" na sua checagem interna — um falso positivo, mas que
+mostrou que o teste estava mal desenhado: procurar uma frase curta acusa
+qualquer menção. Reescrevi a regra para procurar **linhas inteiras** da persona
+(60 caracteres ou mais) dentro do Python. Assim ele pega o que importa, uma
+cópia real do prompt, e ignora menções.
+
+O segundo, no grupo de cobertura. Na primeira execução, o caso `B1` ("Consigo
 bater as duas metas no prazo?") falhou apontando que o fato "cabe ao mesmo
 tempo" não estava no contexto. Investigando: o fato estava lá, escrito como "As
 duas **cabem** ao mesmo tempo" — a asserção é que estava errada. Corrigi a
@@ -117,10 +136,17 @@ realmente importa, que é se o dado **chegou ao modelo**.
 
 ### Pendente
 
-A avaliação da camada de redação exige uma chave da API do Gemini e ainda não foi feita.
-O procedimento está definido: rodar as 10 perguntas de `avaliacao/casos.json`,
-pontuar cada resposta na rubrica de cinco critérios, e registrar aqui a tabela
-com as notas e os ajustes de prompt que forem necessários.
+A avaliação da camada de redação exige uma chave da API do Gemini e ainda não foi
+feita. O procedimento está definido e automatizado até a porta da avaliação:
+
+```bash
+python src/rumo.py --todos --md > avaliacao/respostas.md
+```
+
+Isso roda os 7 comandos de `agent/prompts/` e gera um markdown com a pergunta
+exata, a resposta recebida e os critérios de cada um — sem copiar e colar da
+tela. Falta então pontuar cada resposta na rubrica de cinco critérios e
+registrar aqui a tabela com as notas e os ajustes de prompt necessários.
 
 Previsões registradas antes do teste, em [`03-prompts.md`](03-prompts.md), para
 poderem ser conferidas depois.
@@ -139,5 +165,6 @@ O que faria sentido acrescentar se o projeto continuasse:
 - **Teste de regressão de prompt** — congelar as respostas aprovadas e comparar
   a cada mudança no system prompt, para saber se um ajuste consertou uma coisa
   e quebrou outra.
-- **Latência por resposta** — relevante porque o modelo roda local e a
-  experiência muda muito entre 2 e 20 segundos.
+- **Latência por resposta** — a chamada é de rede, e a experiência muda muito
+  entre 2 e 20 segundos. Vale medir por modelo, já que o seletor da tela troca
+  entre um mais rápido e um mais capaz.

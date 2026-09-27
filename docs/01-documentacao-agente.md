@@ -40,6 +40,13 @@ não tem dinheiro suficiente para contratar um planejador financeiro.
 
 ## Persona e Tom de Voz
 
+> **A definição vale, este documento explica.** A persona que o agente realmente
+> usa está em [`agent/persona.md`](../agent/persona.md), lida em tempo de
+> execução e enviada ao modelo como `system_instruction`. Esta seção comenta as
+> escolhas; ela não é a fonte. Se as duas discordarem, o arquivo é que manda —
+> e a verificação `D3` existe para impedir que uma cópia da persona reapareça
+> dentro do código.
+
 ### Nome do Agente
 
 **Rumo** — o nome diz o que ele entrega: direção. Não promete rentabilidade nem
@@ -84,6 +91,12 @@ flowchart TD
 
     D[(data/<br/>perfil · transações<br/>produtos · atendimentos)] --> C
 
+    P[agent/persona.md<br/>identidade · regras · tom] --> AG[agente.py<br/>carrega a definição]
+    PR[agent/prompts/<br/>comandos prontos] --> AG
+    SK[agent/skills/<br/>contratos] --> AG
+    AG --> B
+    AG --> E
+
     C -->|orçamento, metas,<br/>conflito, produtos filtrados| E[contexto.py<br/>monta bloco de FATOS]
     E -->|system_instruction<br/>+ FATOS| F[API do Gemini<br/>Flash-Lite · camada gratuita]
     F -->|texto explicativo| B
@@ -91,26 +104,37 @@ flowchart TD
     C -.->|os mesmos fatos,<br/>sem passar pelo LLM| G[Painel lateral<br/>números auditáveis]
     G --> B
 
-    C -.->|sem LLM| H[avaliacao/avaliar.py<br/>25 verificações]
+    C -.->|sem LLM| H[avaliacao/avaliar.py<br/>31 verificações]
 
     style C fill:#2a78d6,color:#fff
     style F fill:#eb6834,color:#fff
+    style P fill:#3c8f5a,color:#fff
+    style PR fill:#3c8f5a,color:#fff
+    style SK fill:#3c8f5a,color:#fff
 ```
 
-O azul é onde os números nascem. O laranja é onde o texto nasce. Eles não se
-misturam, e é isso que torna o agente auditável.
+O azul é onde os números nascem. O laranja é onde o texto nasce. O verde é a
+definição do agente, que é texto editável e não código. Os três não se misturam,
+e é isso que torna o agente auditável.
 
 ### Componentes
 
 | Arquivo | Responsabilidade | Depende de LLM? |
 |---|---|---|
+| `agent/persona.md` | A identidade, as regras e o tom — o system prompt de verdade | Não (é texto) |
+| `agent/prompts/*.md` | Um comando pronto por arquivo: a pergunta e os critérios | Não (é texto) |
+| `agent/skills/*/SKILL.md` | O contrato de cada capacidade: quando usar, entradas, limites | Não (é texto) |
 | `src/motor.py` | Lê `data/`, calcula orçamento, metas, conflito e filtra produtos por regra | Não |
-| `src/contexto.py` | Converte os fatos em texto e guarda o system prompt | Não |
+| `src/agente.py` | Carrega `agent/` — persona, comandos e skills | Não |
+| `src/contexto.py` | Junta a persona com o bloco de FATOS | Não |
 | `src/llm.py` | Chamada à API do Gemini — só texto, nenhum número | Sim |
+| `src/rumo.py` | Roda os comandos prontos pelo terminal | Sim |
 | `src/app.py` | Interface Streamlit e estado da conversa | Não diretamente |
-| `avaliacao/avaliar.py` | 25 verificações automáticas sobre a camada de cálculo | Não |
+| `avaliacao/avaliar.py` | 31 verificações automáticas, incluindo a definição do agente | Não |
 
-Quatro dos cinco módulos rodam sem modelo nenhum. Só `llm.py` depende da API.
+Só `llm.py` fala com a API — trocar de provedor mexe num arquivo. E a definição
+do agente não é código nenhum: são quatro arquivos de texto que qualquer pessoa
+abre, lê e edita sem saber Python.
 
 O bloco de FATOS vai no `system_instruction`, não na mensagem do usuário: fato é
 contexto, não fala de quem pergunta. Já o histórico da conversa fica no servidor
@@ -141,19 +165,29 @@ vez de reenviar tudo.
    investimentos, que é atividade regulada.
 7. **Temperatura 0,2.** Aqui não se quer criatividade, se quer fidelidade.
 8. **Painel auditável.** A barra lateral mostra os mesmos números que foram
-   para o modelo, incluindo o bloco de fatos cru. Quem desconfia, confere.
+   para o modelo, o bloco de fatos cru, a persona carregada e as skills
+   declaradas. Quem desconfia, confere na própria tela.
+9. **A definição do agente é verificada.** As checagens `D1`–`D6` garantem que a
+   persona existe, mantém a regra nº 1, não foi duplicada dentro do código, e
+   que toda skill citada por um comando tem contrato escrito. Sem isso, a
+   documentação poderia descrever um agente e o código executar outro.
 
 ### Limitações Declaradas
 
 - **A camada de texto não é testada automaticamente.** Um LLM local pode
   parafrasear mal um número correto. Os testes garantem que o número que
   *entra* está certo, não que o modelo o reproduziu fielmente. Isso é avaliado
-  à mão, com rubrica, em [`04-metricas.md`](04-metricas.md).
+  à mão, com rubrica, em [`04-metricas.md`](04-metricas.md) — e
+  `python src/rumo.py --todos --md` gera o material dessa avaliação.
 - **Três meses de extrato são pouco.** A sobra média ignora sazonalidade — IPVA,
   matrícula, Natal.
 - **Dados mockados, cliente fictício.** Nada aqui foi validado com pessoa real.
 - **Sem rentabilidade nas projeções.** O aporte necessário é calculado por
   divisão simples, sem juros compostos. É conservador de propósito: prometer
   rendimento futuro seria exatamente o que o agente não deve fazer.
+- **As skills não são ferramentas que o modelo escolhe chamar.** Elas rodam
+  antes da conversa, em ordem fixa. O ganho é determinismo; o custo é que o
+  agente não decide buscar um cálculo novo no meio do diálogo — se a pergunta
+  exige um número que ninguém calculou, a resposta correta é dizer que não tem.
 - **Não substitui profissional certificado**, e o agente diz isso quando o
   assunto chega perto de recomendação.

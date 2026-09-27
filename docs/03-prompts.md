@@ -5,7 +5,7 @@ requisição em vez de virar uma string só:
 
 | Parte | Onde vai | Por quê |
 |---|---|---|
-| **System prompt** | `system_instruction` | Quem ele é e o que não pode fazer |
+| **System prompt** | `system_instruction` | Quem ele é e o que não pode fazer. Vem de `agent/persona.md` |
 | **Bloco de FATOS** | `system_instruction`, logo abaixo | Única fonte de números. É contexto, não fala do usuário |
 | **Conversa** | no servidor, via `previous_interaction_id` | Continuidade sem reenviar o histórico a cada turno |
 | **Pergunta** | `input` | O que a pessoa acabou de escrever |
@@ -16,40 +16,61 @@ FATOS como se fossem algo que o usuário afirmou, e não como instrução.
 
 ## System Prompt
 
-```text
-Você é o Rumo, assistente de planejamento de metas financeiras.
+O system prompt **é** [`agent/persona.md`](../agent/persona.md). Não há cópia
+dele aqui, e isso é deliberado.
 
-SEU PAPEL
-Ajudar a pessoa a entender se as metas financeiras dela cabem no orçamento e o
-que muda se ela ajustar prazo, valor ou aporte. Você explica; quem decide é ela.
+Antes, este documento trazia o prompt inteiro num bloco de código e o prompt de
+verdade morava numa string dentro de `src/contexto.py`. Duas cópias, nenhum
+vínculo: bastava alguém ajustar uma regra no código para esta página passar a
+descrever um agente que não existia mais. Documentação que mente é pior que
+documentação ausente, porque dá confiança.
 
-REGRA MAIS IMPORTANTE — VOCÊ NÃO FAZ CONTAS
-Todos os números já foram calculados e estão no bloco FATOS. Use apenas eles.
-- Nunca some, divida, projete nem estime nada por conta própria.
-- Nunca converta prazos ("uns dois anos") em números que não estejam nos FATOS.
-- Se a pessoa pedir um número que não está nos FATOS, diga que não tem esse
-  cálculo disponível e ofereça o que você tem.
+Hoje `src/agente.py` lê `agent/persona.md` em tempo de execução e o envia como
+`system_instruction`. A verificação `D3` de `avaliacao/avaliar.py` falha se
+qualquer frase longa da persona reaparecer dentro do Python.
 
-OUTRAS REGRAS
-- Não recomende um produto específico. Você pode explicar como cada produto
-  compatível funciona e por que ele apareceu na lista, sempre no plural e como
-  alternativas.
-- Não prometa rentabilidade, não garanta resultado, não fale de retorno futuro
-  como se fosse certo.
-- Não responda nada fora de planejamento financeiro pessoal. Nesse caso,
-  lembre o seu papel em uma frase e ofereça voltar ao tema.
-- Se os FATOS forem insuficientes, diga isso claramente em vez de preencher a
-  lacuna. "Não tenho essa informação" é uma resposta correta.
-- Cite sempre o número exato dos FATOS, com o valor em reais formatado.
+Para ver exatamente o que vai para o modelo:
 
-COMO RESPONDER
-- Português do Brasil, direto, sem jargão. No máximo 3 parágrafos curtos.
-- Comece pela resposta, não pelo contexto.
-- Termine com uma pergunta ou próximo passo concreto — a pessoa veio decidir algo.
-- Nunca use emoji.
+```bash
+python src/agente.py     # o que foi carregado, e se está coerente
+python src/contexto.py   # o bloco de FATOS que acompanha
 ```
 
-### Por que ele está escrito assim
+A estrutura da persona:
+
+| Seção de `agent/persona.md` | O que fixa |
+|---|---|
+| Identidade | nome, o que é, para quem, e os três "o que não é" |
+| Papel | explicar, não decidir |
+| Regra nº 1 | **VOCÊ NÃO FAZ CONTAS** — em caixa alta, antes de tudo |
+| Outras regras | não recomendar produto, não prometer rentabilidade, escopo fechado, recusa autorizada |
+| Tom de voz | pt-BR, três parágrafos, sem emoji, termina em próximo passo |
+| Capacidades | a tabela de skills, com link para cada contrato |
+
+## Comandos prontos
+
+Cada arquivo de [`agent/prompts/`](../agent/prompts/) é um comando chamável: o
+app desenha um botão por arquivo e `src/rumo.py` roda pelo terminal. A lista de
+sugestões da tela não está escrita no código — ela é a pasta.
+
+| Comando | Para que serve |
+|---|---|
+| `diagnostico-geral` | primeira conversa, quando a pessoa não sabe o que perguntar |
+| `cabe-no-orcamento` | aporte necessário de cada meta, comparado com a sobra |
+| `conflito-de-metas` | **o caso central**: as duas metas juntas não cabem |
+| `onde-vai-o-dinheiro` | maiores categorias de gasto, ligadas ao déficit |
+| `produtos-para-a-meta` | o que é compatível, e por qual critério |
+| `e-se-eu-esticar-o-prazo` | o principal teste de tentação: convida à conta de cabeça |
+| `fora-de-escopo` | caso de borda: saldo em tempo real + pedido de recomendação |
+
+Cada arquivo guarda, junto da pergunta, a seção "O que uma boa resposta faz" —
+os critérios usados na avaliação humana de [`04-metricas.md`](04-metricas.md).
+Pergunta e critério ficam no mesmo lugar de propósito: separados, o critério
+envelhece sem ninguém notar.
+
+Acrescentar um comando é criar um `.md`. Não se mexe em Python.
+
+## Por que a persona está escrita assim
 
 | Instrução | Problema que ela resolve |
 |---|---|
@@ -158,12 +179,13 @@ mais perigoso que uma recusa.
 
 ## Observações e Aprendizados
 
-> **Estado da validação, sem maquiagem.** A camada de cálculo tem 25
-> verificações automáticas, todas passando ([`04-metricas.md`](04-metricas.md)).
+> **Estado da validação, sem maquiagem.** A camada de cálculo e a definição do
+> agente somam 31 verificações automáticas, todas passando ([`04-metricas.md`](04-metricas.md)).
 > A camada de texto **ainda não foi executada** contra o modelo: é preciso uma
 > chave da API do Gemini, e as respostas acima são o comportamento
 > *especificado*, não transcrições. A rubrica de avaliação manual está pronta em
-> [`04-metricas.md`](04-metricas.md) e é o próximo passo do projeto.
+> [`04-metricas.md`](04-metricas.md), e `python src/rumo.py --todos --md` gera as
+> transcrições reais para preenchê-la. É o próximo passo do projeto.
 
 **Por que a proibição de calcular vem antes de tudo.** A ordem das instruções
 importa: o modelo lê o começo com mais peso. A regra de não calcular está em
