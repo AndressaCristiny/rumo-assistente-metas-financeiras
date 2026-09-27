@@ -19,7 +19,11 @@ A chave nunca entra no código nem no repositório (`.env` está no .gitignore).
 
 Teste rápido da conexão, sem abrir o Streamlit:
 
-    python src/llm.py --teste
+    python src/llm.py --teste      # pergunta real, confere se o número saiu certo
+    python src/llm.py --modelos    # quais modelos a sua chave pode usar
+
+Nome de modelo envelhece: se o `--teste` devolver 404, ele lista os modelos
+disponíveis para a sua chave e você troca o ID em `MODELOS`, logo abaixo.
 """
 
 from __future__ import annotations
@@ -33,6 +37,10 @@ RAIZ = Path(__file__).resolve().parent.parent
 
 # Modelos da camada gratuita. Flash-Lite é o padrão: mais rápido e suficiente
 # para redigir sobre fatos prontos.
+#
+# Estes IDs podem envelhecer — o Google renomeia e aposenta versões. Se der 404,
+# rode `python src/llm.py --modelos` para ver o que a sua chave alcança hoje e
+# troque o ID aqui. É a única linha que precisa mudar.
 MODELOS = {
     "Gemini 3.5 Flash-Lite — mais rápido": "gemini-3.5-flash-lite",
     "Gemini 3.8 Flash — mais capaz": "gemini-3.8-flash",
@@ -88,6 +96,28 @@ def verificar() -> Diagnostico:
             "Biblioteca google-genai não instalada. Rode: pip install -r requirements.txt",
         )
     return Diagnostico(True, "Chave carregada do .env e biblioteca pronta.")
+
+
+def modelos_disponiveis() -> list[str]:
+    """Pergunta à API quais modelos a sua chave pode usar.
+
+    Existe porque nome de modelo muda: um ID que funcionava ontem volta 404
+    amanhã, e a mensagem de erro da API não sugere o substituto. Em vez de
+    confiar na lista fixa de `MODELOS`, dá para conferir.
+
+        python src/llm.py --modelos
+    """
+    from google import genai
+
+    cliente = genai.Client(api_key=obter_chave())
+    nomes = []
+    for m in cliente.models.list():
+        nome = getattr(m, "name", "") or ""
+        acoes = getattr(m, "supported_actions", None) or getattr(m, "supported_generation_methods", None) or []
+        if acoes and not any("generate" in str(a).lower() or "interaction" in str(a).lower() for a in acoes):
+            continue
+        nomes.append(nome.replace("models/", ""))
+    return sorted(nomes)
 
 
 def responder(
@@ -152,6 +182,18 @@ def _teste() -> int:
         texto, ident = responder(SYSTEM_PROMPT, bloco_de_fatos(), pergunta)
     except Exception as erro:  # noqa: BLE001
         print(f"FALHOU: {type(erro).__name__}: {erro}")
+        if "404" in str(erro) or "not found" in str(erro).lower():
+            print(
+                f"\nO modelo '{MODELO_PADRAO}' não existe para a sua chave. "
+                "Nomes de modelo mudam com o tempo."
+            )
+            try:
+                print("Disponíveis agora:")
+                for nome in modelos_disponiveis():
+                    print(f"  {nome}")
+                print("\nEscolha um Flash da lista e ajuste MODELOS em src/llm.py.")
+            except Exception as erro2:  # noqa: BLE001
+                print(f"  (não consegui listar: {erro2})")
         return 1
     print(texto)
     print("-" * 60)
@@ -163,5 +205,16 @@ def _teste() -> int:
     return 0
 
 
+def _listar_modelos() -> int:
+    diag = verificar()
+    if not diag.pronto:
+        print(diag.recado)
+        return 1
+    for nome in modelos_disponiveis():
+        marca = "  <- padrao" if nome == MODELO_PADRAO else ""
+        print(f"{nome}{marca}")
+    return 0
+
+
 if __name__ == "__main__":
-    raise SystemExit(_teste() if "--teste" in sys.argv else _teste())
+    raise SystemExit(_listar_modelos() if "--modelos" in sys.argv else _teste())

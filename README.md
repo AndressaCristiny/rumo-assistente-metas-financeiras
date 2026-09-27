@@ -196,6 +196,16 @@ python src/llm.py --teste   # confere a conexão antes de abrir a tela
 streamlit run src/app.py
 ```
 
+Se o teste devolver **404**, o nome do modelo envelheceu — o Google renomeia e
+aposenta versões. Nesse caso:
+
+```bash
+python src/llm.py --modelos   # o que a sua chave alcança hoje
+```
+
+Escolha um Flash da lista e troque o ID em `MODELOS`, no topo de `src/llm.py`.
+É a única linha que muda.
+
 **Sem chave nenhuma**, a camada de cálculo continua funcionando — e é onde está a
 parte interessante:
 
