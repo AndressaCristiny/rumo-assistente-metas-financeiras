@@ -1,0 +1,10 @@
+# Aplicação
+streamlit>=1.30
+requests>=2.31
+pandas>=2.0
+
+# O LLM roda localmente via Ollama e não é instalado por pip:
+#   https://ollama.com  ->  ollama serve  ->  ollama pull llama3.2
+#
+# A camada de cálculo (src/motor.py) e a avaliação (avaliacao/avaliar.py)
+# precisam apenas de pandas.
