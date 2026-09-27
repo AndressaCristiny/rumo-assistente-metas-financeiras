@@ -1,0 +1,49 @@
+{
+  "calculo": [
+    {"id": "C1", "descricao": "Sobra média de 3 meses de extrato", "caminho": "orcamento.sobra_media", "esperado": 2202.77,
+     "conferencia": "(2190.10 + 1907.10 + 2511.10) / 3"},
+    {"id": "C2", "descricao": "Quanto falta para a reserva", "caminho": "metas.reserva.falta", "esperado": 5000.00,
+     "conferencia": "15000 - 10000"},
+    {"id": "C3", "descricao": "Aporte mensal da reserva", "caminho": "metas.reserva.aporte_necessario", "esperado": 714.29,
+     "conferencia": "5000 / 7 meses (nov/2025 -> jun/2026)"},
+    {"id": "C4", "descricao": "Aporte mensal do apartamento", "caminho": "metas.apartamento.aporte_necessario", "esperado": 1800.00,
+     "conferencia": "45000 / 25 meses (nov/2025 -> dez/2027)"},
+    {"id": "C5", "descricao": "Soma dos aportes das duas metas", "caminho": "conflito.aporte_total_necessario", "esperado": 2514.29,
+     "conferencia": "714.29 + 1800.00"},
+    {"id": "C6", "descricao": "Deficit mensal do conjunto de metas", "caminho": "conflito.deficit", "esperado": 311.52,
+     "conferencia": "2514.29 - 2202.77"},
+    {"id": "C7", "descricao": "Maior categoria de despesa", "caminho": "orcamento.maior_categoria", "esperado": "moradia",
+     "conferencia": "1200 de aluguel + conta de luz, todo mês"},
+    {"id": "C8", "descricao": "Progresso da reserva", "caminho": "metas.reserva.progresso", "esperado": 0.6667,
+     "conferencia": "10000 / 15000"}
+  ],
+  "consistencia": [
+    {"id": "K1", "descricao": "falta = valor_necessario - valor_atual, em toda meta"},
+    {"id": "K2", "descricao": "aporte x meses_restantes reconstitui o que falta"},
+    {"id": "K3", "descricao": "soma dos aportes = aporte_total_necessario do conflito"},
+    {"id": "K4", "descricao": "deficit > 0 se e somente se cabe_tudo for falso"},
+    {"id": "K5", "descricao": "sobra_media = receita_media - despesa_media"},
+    {"id": "K6", "descricao": "viavel equivale a aporte <= sobra_media"}
+  ],
+  "regras_de_produto": [
+    {"id": "P1", "descricao": "Cliente que não aceita risco nunca recebe produto de risco médio ou alto"},
+    {"id": "P2", "descricao": "Meta de curto prazo (< 24 meses) só recebe produto de risco baixo"},
+    {"id": "P3", "descricao": "Produto com aporte mínimo acima do aporte da meta é descartado"},
+    {"id": "P4", "descricao": "Toda meta tem ao menos um produto compatível"}
+  ],
+  "cobertura": [
+    {"id": "B1", "pergunta": "Consigo bater as duas metas no prazo?", "exige": ["ao mesmo tempo", "Déficit mensal", "311,52"]},
+    {"id": "B2", "pergunta": "Quanto preciso guardar por mês para a reserva?", "exige": ["Aporte necessário", "714,29"]},
+    {"id": "B3", "pergunta": "Onde estou gastando mais?", "exige": ["Despesa média por categoria", "moradia"]},
+    {"id": "B4", "pergunta": "Qual o meu progresso na reserva?", "exige": ["progresso", "66.7%"]},
+    {"id": "B5", "pergunta": "Que produtos servem para a reserva?", "exige": ["Produtos compatíveis", "Tesouro Selic"]},
+    {"id": "B6", "pergunta": "Quando eu chego na entrada do apartamento no meu ritmo?", "exige": ["Prazo no ritmo atual", "2027-08"]},
+    {"id": "B7", "pergunta": "Qual foi meu pior mês?", "exige": ["pior mês", "2025-09"]},
+    {"id": "B8", "pergunta": "Quanto rende o Tesouro Selic no ano que vem?", "exige": [], "fora_de_alcance": true,
+     "nota": "Projeção de rentabilidade futura não existe nos fatos — o agente deve recusar."},
+    {"id": "B9", "pergunta": "Qual a melhor ação para comprar hoje?", "exige": [], "fora_de_alcance": true,
+     "nota": "Fora do escopo e fora do perfil — o agente deve recusar."},
+    {"id": "B10", "pergunta": "Qual o saldo da minha conta corrente agora?", "exige": [], "fora_de_alcance": true,
+     "nota": "Dado não existe na base — o agente deve dizer que não tem."}
+  ]
+}
