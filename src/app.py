@@ -2,6 +2,10 @@
 Rumo — assistente de planejamento de metas financeiras.
 Interface Streamlit + API do Gemini.
 
+Nada nesta tela é escrito à mão: a persona vem de `agent/persona.md`, os botões
+de comando vêm de `agent/prompts/*.md` e o painel de skills vem de
+`agent/skills/*/SKILL.md`. Mexer na pasta `agent/` muda o app.
+
 Execução:
     pip install -r requirements.txt
     cp .env.example .env        # e coloque a sua GOOGLE_API_KEY
@@ -17,6 +21,7 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import agente                                                # noqa: E402
 import llm                                                   # noqa: E402
 from contexto import SYSTEM_PROMPT, bloco_de_fatos           # noqa: E402
 from motor import brl, levantar_fatos                        # noqa: E402
@@ -25,9 +30,11 @@ st.set_page_config(page_title="Rumo — metas financeiras", page_icon="🧭", la
 
 fatos = levantar_fatos()
 texto_fatos = bloco_de_fatos(fatos)
+comandos = agente.listar_comandos()
+skills = agente.listar_skills()
 
 # --------------------------------------------------------------------------- #
-# Barra lateral — painel de fatos e configuração
+# Barra lateral — painel de fatos, definição do agente e configuração
 # --------------------------------------------------------------------------- #
 
 with st.sidebar:
@@ -68,7 +75,18 @@ with st.sidebar:
             f"mas a sobra é {brl(cf['sobra_media'])}. Faltam {brl(cf['deficit'])}."
         )
 
-    with st.expander("Ver o bloco de fatos enviado ao modelo"):
+    st.divider()
+    st.subheader("Definição do agente")
+    st.caption("Lida de `agent/` a cada execução — o arquivo é o comportamento.")
+
+    with st.expander(f"Skills declaradas ({len(skills)})"):
+        for s in skills:
+            st.markdown(f"**`{s.id}`** → `{s.funcao}`")
+            st.caption(s.quando or "—")
+            st.caption(f"contrato: `{s.arquivo}`")
+    with st.expander("Persona e regras (agent/persona.md)"):
+        st.markdown(SYSTEM_PROMPT)
+    with st.expander("Bloco de fatos enviado ao modelo"):
         st.code(texto_fatos, language="text")
 
     st.divider()
@@ -99,25 +117,48 @@ if "mensagens" not in st.session_state:
 if "interacao" not in st.session_state:
     # id da última interação — o histórico fica no servidor do Gemini
     st.session_state.interacao = None
+if "pendente" not in st.session_state:
+    st.session_state.pendente = None
 
-if not st.session_state.mensagens:
-    st.write("**Experimente perguntar:**")
-    for sugestao in [
-        "Consigo bater as duas metas no prazo?",
-        "Quanto preciso guardar por mês para a reserva de emergência?",
-        "Onde estou gastando mais?",
-        "Que produtos servem para a reserva?",
-        "Qual o saldo da minha conta corrente agora?",
-    ]:
-        st.markdown(f"- {sugestao}")
+
+# --------------------------------------------------------------------------- #
+# Comandos prontos — um botão por arquivo em agent/prompts/
+# --------------------------------------------------------------------------- #
+
+st.write("**Comandos prontos**")
+st.caption(
+    f"{len(comandos)} comandos definidos em `agent/prompts/`. "
+    "Cada botão envia a pergunta exata registrada no arquivo."
+)
+
+for faixa in (comandos[i:i + 3] for i in range(0, len(comandos), 3)):
+    for coluna, cmd in zip(st.columns(3), faixa):
+        with coluna:
+            if st.button(cmd.titulo, key=f"cmd-{cmd.id}",
+                         help=f"{cmd.quando}\n\n{cmd.arquivo}",
+                         use_container_width=True, disabled=not diag.pronto):
+                st.session_state.pendente = cmd.pergunta
+
+with st.expander("Ver o que cada comando envia"):
+    for cmd in comandos:
+        st.markdown(f"**{cmd.titulo}** · `{cmd.id}`")
+        st.caption(cmd.quando)
+        st.code(cmd.pergunta, language="text")
+        if cmd.skills:
+            st.caption("Skills: " + ", ".join(f"`{s}`" for s in cmd.skills))
+
+st.divider()
 
 for msg in st.session_state.mensagens:
     st.chat_message(msg["role"]).write(msg["content"])
 
-pergunta = st.chat_input(
+digitada = st.chat_input(
     "Sua dúvida sobre as metas..." if diag.pronto else "Configure a chave no .env para conversar",
     disabled=not diag.pronto,
 )
+
+pergunta = digitada or st.session_state.pendente
+st.session_state.pendente = None
 
 if pergunta:
     st.session_state.mensagens.append({"role": "user", "content": pergunta})

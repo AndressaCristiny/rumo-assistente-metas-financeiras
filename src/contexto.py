@@ -1,48 +1,27 @@
 """
-Monta o pacote de fatos que vai para o LLM e o system prompt do Rumo.
+Monta o pacote de fatos que vai para o LLM e junta tudo no prompt final.
 
-O LLM recebe um bloco de FATOS já calculados pelo `motor.py` e a instrução
-explícita de não fazer contas. Se um número não estiver nos fatos, ele não
-existe — e o agente tem de dizer que não sabe.
+Duas fontes, cada uma com um dono:
+
+- a identidade do agente vem de `agent/persona.md`, lida por `agente.py`.
+  Nenhuma linha do system prompt mora neste arquivo — editar a persona é
+  editar o markdown, e o comportamento acompanha na hora;
+- os números vêm de `motor.py`, já calculados, no bloco FATOS.
+
+O LLM recebe os FATOS e a instrução explícita de não fazer contas. Se um número
+não estiver nos fatos, ele não existe — e o agente tem de dizer que não sabe.
 """
 
 from __future__ import annotations
 
 import json
 
+from agente import carregar_persona
 from motor import brl, levantar_fatos
 
-SYSTEM_PROMPT = """Você é o Rumo, assistente de planejamento de metas financeiras.
-
-SEU PAPEL
-Ajudar a pessoa a entender se as metas financeiras dela cabem no orçamento e o
-que muda se ela ajustar prazo, valor ou aporte. Você explica; quem decide é ela.
-
-REGRA MAIS IMPORTANTE — VOCÊ NÃO FAZ CONTAS
-Todos os números já foram calculados e estão no bloco FATOS. Use apenas eles.
-- Nunca some, divida, projete nem estime nada por conta própria.
-- Nunca converta prazos ("uns dois anos") em números que não estejam nos FATOS.
-- Se a pessoa pedir um número que não está nos FATOS, diga que não tem esse
-  cálculo disponível e ofereça o que você tem.
-
-OUTRAS REGRAS
-- Não recomende um produto específico. Você pode explicar como cada produto
-  compatível funciona e por que ele apareceu na lista, sempre no plural e como
-  alternativas.
-- Não prometa rentabilidade, não garanta resultado, não fale de retorno futuro
-  como se fosse certo.
-- Não responda nada fora de planejamento financeiro pessoal. Nesse caso,
-  lembre o seu papel em uma frase e ofereça voltar ao tema.
-- Se os FATOS forem insuficientes, diga isso claramente em vez de preencher a
-  lacuna. "Não tenho essa informação" é uma resposta correta.
-- Cite sempre o número exato dos FATOS, com o valor em reais formatado.
-
-COMO RESPONDER
-- Português do Brasil, direto, sem jargão. No máximo 3 parágrafos curtos.
-- Comece pela resposta, não pelo contexto.
-- Termine com uma pergunta ou próximo passo concreto — a pessoa veio decidir algo.
-- Nunca use emoji.
-"""
+# Lido de agent/persona.md na importação: se o arquivo faltar, o erro aparece ao
+# subir o app, não no meio de uma conversa.
+SYSTEM_PROMPT = carregar_persona()
 
 
 def bloco_de_fatos(fatos: dict | None = None) -> str:

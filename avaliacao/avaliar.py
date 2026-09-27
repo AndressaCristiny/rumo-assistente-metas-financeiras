@@ -20,7 +20,9 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ / "src"))
 
-from contexto import bloco_de_fatos                                   # noqa: E402
+import agente                                                         # noqa: E402
+import motor                                                          # noqa: E402
+from contexto import SYSTEM_PROMPT, bloco_de_fatos                     # noqa: E402
 from motor import analisar_metas, carregar, levantar_fatos, produtos_compativeis, analisar_orcamento  # noqa: E402
 
 CASOS = json.loads((Path(__file__).parent / "casos.json").read_text(encoding="utf-8"))
@@ -98,6 +100,37 @@ def bloco_cobertura(fatos):
     return res
 
 
+def bloco_definicao(fatos):
+    """A definição do agente vive em arquivos de texto (ver AGENTS.md). Se ela
+    sair do ar, ou se alguém recolocar uma cópia do prompt dentro do Python, o
+    agente volta a poder divergir da documentação em silêncio. Isto verifica
+    justamente isso."""
+    comandos = agente.listar_comandos()
+    skills = agente.listar_skills()
+    declaradas = {s.id for s in skills}
+
+    fonte_py = "\n".join(
+        p.read_text(encoding="utf-8") for p in sorted((RAIZ / "src").glob("*.py"))
+    )
+
+    checa = {
+        "D1": agente.PERSONA.exists() and len(SYSTEM_PROMPT) > 500,
+        "D2": "VOCÊ NÃO FAZ CONTAS" in SYSTEM_PROMPT,
+        # nenhuma frase inteira da persona pode estar copiada no código: é assim
+        # que a divergência entre documentação e comportamento voltaria a existir
+        "D3": not [
+            linha for linha in SYSTEM_PROMPT.splitlines()
+            if len(linha.strip()) >= 60 and linha.strip() in fonte_py
+        ],
+        "D4": bool(comandos) and all(len(c.pergunta) > 15 for c in comandos),
+        "D5": all(n in declaradas for c in comandos for n in c.skills),
+        "D6": bool(skills) and all(
+            hasattr(motor, s.funcao.split(".")[-1]) for s in skills if s.funcao
+        ),
+    }
+    return [{**c, "ok": checa[c["id"]]} for c in CASOS["definicao_do_agente"]]
+
+
 def relatorio(markdown: bool = False) -> int:
     fatos = levantar_fatos()
     grupos = [
@@ -105,6 +138,7 @@ def relatorio(markdown: bool = False) -> int:
         ("Consistência interna", bloco_consistencia(fatos)),
         ("Regras de seleção de produto", bloco_produtos(fatos)),
         ("Cobertura de fatos por pergunta", bloco_cobertura(fatos)),
+        ("Definição do agente", bloco_definicao(fatos)),
     ]
 
     linhas, falhas, total = [], 0, 0
