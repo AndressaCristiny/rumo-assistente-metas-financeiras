@@ -1,10 +1,10 @@
 """
 Rumo — assistente de planejamento de metas financeiras.
-Interface Streamlit + LLM local via Ollama.
+Interface Streamlit + API do Gemini.
 
 Execução:
-    ollama serve
-    ollama pull llama3.2
+    pip install -r requirements.txt
+    cp .env.example .env        # e coloque a sua GOOGLE_API_KEY
     streamlit run src/app.py
 """
 
@@ -13,60 +13,22 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import requests
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from contexto import bloco_de_fatos, montar_prompt          # noqa: E402
+import llm                                                   # noqa: E402
+from contexto import SYSTEM_PROMPT, bloco_de_fatos           # noqa: E402
 from motor import brl, levantar_fatos                        # noqa: E402
-
-OLLAMA_URL = "http://localhost:11434"
-MODELO = "llama3.2"
-TIMEOUT = 180
 
 st.set_page_config(page_title="Rumo — metas financeiras", page_icon="🧭", layout="wide")
 
-
-# --------------------------------------------------------------------------- #
-# LLM
-# --------------------------------------------------------------------------- #
-
-def ollama_disponivel() -> tuple[bool, str]:
-    try:
-        r = requests.get(f"{OLLAMA_URL}/api/tags", timeout=3)
-        r.raise_for_status()
-        modelos = [m["name"] for m in r.json().get("models", [])]
-        if not modelos:
-            return False, "O Ollama está rodando, mas nenhum modelo foi baixado. Rode: ollama pull llama3.2"
-        if not any(m.split(":")[0] == MODELO.split(":")[0] for m in modelos):
-            return False, f"O modelo {MODELO} não está instalado. Disponíveis: {', '.join(modelos)}"
-        return True, f"Ollama conectado — modelo {MODELO}"
-    except requests.exceptions.RequestException:
-        return False, "Ollama não está rodando. Abra um terminal e rode: ollama serve"
-
-
-def perguntar(pergunta: str, historico: list[dict]) -> str:
-    resposta = requests.post(
-        f"{OLLAMA_URL}/api/generate",
-        json={
-            "model": MODELO,
-            "prompt": montar_prompt(pergunta, historico),
-            "stream": False,
-            # Temperatura baixa: aqui não se quer criatividade, se quer fidelidade aos fatos.
-            "options": {"temperature": 0.2, "num_ctx": 8192},
-        },
-        timeout=TIMEOUT,
-    )
-    resposta.raise_for_status()
-    return resposta.json()["response"].strip()
-
-
-# --------------------------------------------------------------------------- #
-# Barra lateral — o painel de fatos
-# --------------------------------------------------------------------------- #
-
 fatos = levantar_fatos()
+texto_fatos = bloco_de_fatos(fatos)
+
+# --------------------------------------------------------------------------- #
+# Barra lateral — painel de fatos e configuração
+# --------------------------------------------------------------------------- #
 
 with st.sidebar:
     st.header("Painel do cliente")
@@ -107,7 +69,11 @@ with st.sidebar:
         )
 
     with st.expander("Ver o bloco de fatos enviado ao modelo"):
-        st.code(bloco_de_fatos(fatos), language="text")
+        st.code(texto_fatos, language="text")
+
+    st.divider()
+    rotulo = st.selectbox("Modelo", list(llm.MODELOS), index=0)
+    modelo = llm.MODELOS[rotulo]
 
 
 # --------------------------------------------------------------------------- #
@@ -117,17 +83,22 @@ with st.sidebar:
 st.title("🧭 Rumo")
 st.caption("Assistente de planejamento de metas financeiras — o modelo explica, o Python calcula.")
 
-ok, recado = ollama_disponivel()
-(st.success if ok else st.error)(recado)
-if not ok:
+diag = llm.verificar()
+if diag.pronto:
+    st.success(diag.recado)
+else:
+    st.error(diag.recado)
     st.info(
-        "O Rumo precisa de um modelo local para redigir as respostas. "
-        "A camada de cálculo, no painel ao lado, funciona sem ele — e é ela que "
-        "produz todos os números."
+        "A camada de cálculo, no painel ao lado, funciona sem chave nenhuma — e é ela "
+        "que produz todos os números. A chave é necessária apenas para o modelo redigir "
+        "as explicações."
     )
 
 if "mensagens" not in st.session_state:
     st.session_state.mensagens = []
+if "interacao" not in st.session_state:
+    # id da última interação — o histórico fica no servidor do Gemini
+    st.session_state.interacao = None
 
 if not st.session_state.mensagens:
     st.write("**Experimente perguntar:**")
@@ -135,25 +106,36 @@ if not st.session_state.mensagens:
         "Consigo bater as duas metas no prazo?",
         "Quanto preciso guardar por mês para a reserva de emergência?",
         "Onde estou gastando mais?",
-        "Qual produto é melhor para a reserva?",
+        "Que produtos servem para a reserva?",
+        "Qual o saldo da minha conta corrente agora?",
     ]:
         st.markdown(f"- {sugestao}")
 
 for msg in st.session_state.mensagens:
     st.chat_message(msg["role"]).write(msg["content"])
 
-if pergunta := st.chat_input("Sua dúvida sobre as metas..." if ok else "Inicie o Ollama para conversar",
-                             disabled=not ok):
+pergunta = st.chat_input(
+    "Sua dúvida sobre as metas..." if diag.pronto else "Configure a chave no .env para conversar",
+    disabled=not diag.pronto,
+)
+
+if pergunta:
     st.session_state.mensagens.append({"role": "user", "content": pergunta})
     st.chat_message("user").write(pergunta)
 
     with st.chat_message("assistant"), st.spinner("Consultando os fatos..."):
         try:
-            resposta = perguntar(pergunta, st.session_state.mensagens[:-1])
-        except requests.exceptions.Timeout:
-            resposta = "O modelo demorou demais para responder. Tente de novo ou use um modelo menor."
-        except requests.exceptions.RequestException as erro:
-            resposta = f"Não consegui falar com o Ollama: {erro}"
-        st.write(resposta)
+            resposta, id_interacao = llm.responder(
+                system_prompt=SYSTEM_PROMPT,
+                fatos=texto_fatos,
+                pergunta=pergunta,
+                interacao_anterior=st.session_state.interacao,
+                modelo=modelo,
+            )
+            st.session_state.interacao = id_interacao
+            st.write(resposta)
+        except Exception as erro:  # noqa: BLE001 — a mensagem da API é o que ajuda a depurar
+            resposta = f"Não consegui falar com a API: {erro}"
+            st.error(resposta)
 
     st.session_state.mensagens.append({"role": "assistant", "content": resposta})
